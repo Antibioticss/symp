@@ -43,7 +43,10 @@ typedef struct {
     int32_t cputype;
     long base_offset;
 
-    /* __DATA ending */
+    /* __TEXT vm slide */
+    uint64_t vm_slide;
+
+    /* mapped file end offset we will read up to (covers __TEXT + __DATA*) */
     uint64_t dataend_off;
 
     /* objc sections */

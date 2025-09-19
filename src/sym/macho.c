@@ -110,6 +110,13 @@ macho_objc_info_t *parse_objc_info(FILE *fp) {
     for (int i = 0; i < header->ncmds; i++) {
         if (command->cmd == LC_SEGMENT_64) {
             const struct segment_command_64 *seg_cmd = (void *)command;
+            if (strcmp(seg_cmd->segname, SEG_TEXT) == 0) { /* __TEXT */
+                /* addr_vm - text_vm = addr_file - text_file */
+                macho_info->vm_slide = seg_cmd->fileoff - seg_cmd->vmaddr;
+                /* also include __TEXT in the mapped end */
+                if (dataend < seg_cmd->fileoff + seg_cmd->filesize)
+                    dataend = seg_cmd->fileoff + seg_cmd->filesize;
+            }
             if (strncmp(seg_cmd->segname, "__DATA", 6) == 0) {
                 if (dataend < seg_cmd->fileoff + seg_cmd->filesize)
                     dataend = seg_cmd->fileoff + seg_cmd->filesize;
