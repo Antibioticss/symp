@@ -28,13 +28,13 @@ Clone the repo and build with `cmake`.
 git clone https://github.com/Antibioticss/symp.git
 cd symp
 mkdir build && cd build
-cmake .. && make
+cmake .. -DCMAKE_BUILD_TYPE=Release && cmake --build .
 ```
 
 Install to `/usr/local/bin`:
 
 ```sh
-sudo make install
+sudo cmake --install .
 ```
 
 ## Usage

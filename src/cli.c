@@ -14,18 +14,20 @@ int o_builtin_idx = -1;
 bool o_quiet = false;
 
 static void usage() {
-    puts("symp - a symbol patching tool");
+    puts("symp - Mach-O symbol patching tool");
     puts("usage: symp [options] -- <symbol> <file>");
     puts("options:");
-    puts("  -a, --arch <arch>         arch of the binary to be patched, only x86_64 and arm64 are supported");
+    puts("  -a, --arch <arch>         select an arch in the binary, supported: x86_64/arm64");
     puts("  -p, --patch <patch>       use builtin patches, available: ret, ret0, ret1, ret2");
     puts("  -b, --binary <binary>     use a binary file as patch");
     puts("  -x, --hex <hex string>    hex string of the patch");
-    puts("  -q, --quiet               suppress match count messages (useful for command substitution)");
+    puts("  -q, --quiet               suppress match count messages");
+    puts("  -v, --version             show version number");
+    puts("  -h, --help                show this usage text");
 }
 
 int parse_arguments(int argc, char **argv) {
-    if (argc <= 2) {
+    if (argc <= 1) {
         usage();
         return 1;
     }
@@ -39,11 +41,12 @@ int parse_arguments(int argc, char **argv) {
             {"binary", required_argument, 0, 'b'},
             {"hex",    required_argument, 0, 'x'},
             {"quiet",  no_argument, 0, 'q'},
+            {"version",no_argument, 0, 'v'},
             {"help",   no_argument, 0, 'h'},
             {0, 0, 0, 0}
         };
         int option_index = 0;
-        int c = getopt_long(argc, argv, "a:p:b:x:qh", long_options, &option_index);
+        int c = getopt_long(argc, argv, "a:p:b:x:qvh", long_options, &option_index);
         if (c == -1)
             break;
         switch (c) {
@@ -120,6 +123,11 @@ int parse_arguments(int argc, char **argv) {
         case 'q':
             o_quiet = true;
             break;
+        case 'v':
+            printf("symp v%s\n", VERSION_STR);
+            o_mode = USAGE_MODE;
+            free(xbuf);
+            return 0;
         case 'h':
             usage();
             o_mode = USAGE_MODE;

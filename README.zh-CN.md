@@ -27,13 +27,13 @@ Releases: https://github.com/Antibioticss/symp/releases
 git clone https://github.com/Antibioticss/symp.git
 cd symp
 mkdir build && cd build
-cmake .. && make
+cmake .. -DCMAKE_BUILD_TYPE=Release && cmake --build .
 ```
 
 安装到`/usr/local/bin`
 
 ```sh
-sudo make install
+sudo cmake --install .
 ```
 
 ## 使用
