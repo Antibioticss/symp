@@ -41,7 +41,7 @@ jobs:
     - name: upload build artifact (binary)
       uses: actions/upload-artifact@v4
       with:
-        name: symp.zip
+        name: symp
         path: ${{github.workspace}}/build/symp
         compression-level: 9
 

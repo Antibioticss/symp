@@ -77,7 +77,7 @@ Three symbol formats are supported:
 
 | Argument        | Description                                                  | Example            |
 | --------------- | ------------------------------------------------------------ | ------------------ |
-| `-p`/`--patch`  | use a built-in patch; available values: `ret`, `ret0`, `ret1`, `ret2` | `-p ret1`          |
+| `-p`/`--patch`  | use a built-in patch; available values: `nop`, `ret`, `ret0`, `ret1`, `ret2` | `-p ret1`          |
 | `-b`/`--binary` | use a binary file as the patch                               | `-b data.bin`      |
 | `-x`/`--hex`    | use hex data as the patch (case-insensitive; spaces allowed) | `-x "C0 03 5F D6"` |
 | `-a`/`--arch`   | select an arch in a `FAT` file; currently supports `x86_64` and `arm64` | `-a arm64`         |

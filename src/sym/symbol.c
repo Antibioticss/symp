@@ -87,6 +87,10 @@ long solve_symbol(FILE *fp, const macho_symbol_info_t *macho_info, const char* s
         const uint32_t *indirectsym_entry = read_file_off(fp, nstubs * sizeof(uint32_t), base_offset + entry_off);
         for (int i = 0; i < nstubs; i++) {
             uint32_t nl_idx = indirectsym_entry[i];
+            if (nl_idx == INDIRECT_SYMBOL_LOCAL ||
+                nl_idx == (INDIRECT_SYMBOL_LOCAL | INDIRECT_SYMBOL_ABS)) {
+                continue;
+            }
             if (strcmp(symbol_name, str_tbl + nl_tbl[nl_idx].n_un.n_strx) == 0) {
                 /* stubs_off is direct file offset */
                 symbol_address = base_offset + macho_info->stubs_off + i * (uint64_t)macho_info->stub_len;
