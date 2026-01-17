@@ -5,7 +5,7 @@
 #include <stdlib.h>
 #include <stdbool.h>
 
-#define VERSION_STR "1.2"
+#define VERSION_STR "1.3"
 
 #define ARRAY_LEN(arr) (sizeof(arr) / sizeof((arr)[0]))
 

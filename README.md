@@ -73,6 +73,8 @@ Three symbol formats are supported:
 | `ObjC` symbol   | does not demangle class names; starts with `+`/`-`, enclosed in `[]` | `-[MyClass hello]` |
 | Regular symbol  | anything that does not match the two cases above                      | `_printf`          |
 
+Category in `ObjC` is supported, but note that **Category name** should be used rather than original Class name to resolve the address.
+
 ### Arguments
 
 | Argument        | Description                                                  | Example            |

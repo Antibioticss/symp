@@ -72,6 +72,8 @@ symp -b new.bin -- '_old_func' file
 | `ObjC`符号名 | 不会demangle类名，以`+`/`-`开头，用`[]`框起来      | `-[MyClass hello]` |
 | 一般的符号名 | 不满足上面两条的符号都会当作此类型                 | `_printf`          |
 
+支持 `ObjC` 的 Category，但需要用 **Category 名称**作为类名来解析地址
+
 ### 参数
 
 | 参数 | 说明 | 示例 |
