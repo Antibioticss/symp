@@ -3,13 +3,30 @@
 
 #include <stdio.h>
 #include <stdint.h>
+#include <stdbool.h>
+
+ #define max(a,b) \
+   ({ __typeof__ (a) _a = (a); \
+       __typeof__ (b) _b = (b); \
+     _a > _b ? _a : _b; })
+
+typedef struct {
+    uint32_t off;
+    uint64_t size;
+} fileseg_t;
+
+typedef struct {
+    uint32_t off;
+    uint64_t addr;
+    uint64_t size;
+} vmseg_t;
 
 typedef struct {
     int32_t cputype;
     long base_offset;
 
     /* __TEXT vm slide */
-    uint64_t vm_slide;
+    int64_t vm_slide;
 } macho_basic_info_t;
 
 typedef struct {
@@ -17,24 +34,21 @@ typedef struct {
     long base_offset;
 
     /* __TEXT vm slide */
-    uint64_t vm_slide;
+    int64_t vm_slide;
 
     /* from LC_SYMTAB */
     uint32_t symoff;
     uint32_t nsyms;
-    uint32_t stroff;
-    uint32_t strsize;
+    fileseg_t strtab;
 
     /* from LC_DYLD_INFO(_ONLY) or LC_DYLD_EXPORTS_TRIE */
-    uint32_t export_off;
-    uint32_t export_size;
+    fileseg_t export;
 
     /* from LC_DYSYMTAB */
     uint32_t indirectsymoff;
 
     /* from S_SYMBOL_STUBS section */
-    uint32_t stubs_off;
-    uint64_t stubs_size;
+    fileseg_t stubs;
     uint32_t indirectsym_idx;
     uint32_t stub_len;
 } macho_symbol_info_t;
@@ -43,15 +57,17 @@ typedef struct {
     int32_t cputype;
     long base_offset;
 
-    /* __TEXT vm slide */
-    uint64_t vm_slide;
+    /* vm segment */
+    vmseg_t text_vm;  // TEXT
+    vmseg_t datac_vm; // DATA_CONST
+    vmseg_t data_vm;  // DATA (last)
 
-    /* mapped file end offset we will read up to (covers __TEXT + __DATA*) */
-    uint64_t dataend_off;
+    /* has LC_DYLD_CHAINED_FIXUPS? */
+    bool chained_fixup;
 
     /* objc sections */
-    uint32_t objc_classlist_off;
-    uint64_t objc_classlist_size;
+    fileseg_t objc_classlist;
+    fileseg_t objc_catlist;
 } macho_objc_info_t;
 
 /* 
@@ -68,6 +84,6 @@ macho_objc_info_t *parse_objc_info(FILE *fp);
 long solve_symbol(FILE *fp, const macho_symbol_info_t *macho_info, const char* symbol_name);
 
 /* defined in objcmeta.c */
-long solve_objc_symbol(FILE *fp, const macho_objc_info_t *macho_info, const char* symbol_name);
+long solve_objc_symbol(FILE *fp, const macho_objc_info_t *mi, const char* symbol_name);
 
 #endif

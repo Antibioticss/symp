@@ -64,9 +64,9 @@ long solve_symbol(FILE *fp, const macho_symbol_info_t *macho_info, const char* s
     uint64_t symbol_address = 0;
     const long base_offset = macho_info->base_offset;
 
-    if (macho_info->export_off != 0) {
+    if (macho_info->export.off != 0) {
         /* export table search */
-        uint8_t *export_trie = read_file_off(fp, macho_info->export_size, base_offset + macho_info->export_off);
+        uint8_t *export_trie = read_file_off(fp, macho_info->export.size, base_offset + macho_info->export.off);
         symbol_address = trie_query(export_trie, symbol_name);
         free(export_trie);
         if (symbol_address != 0) {
@@ -78,12 +78,12 @@ long solve_symbol(FILE *fp, const macho_symbol_info_t *macho_info, const char* s
 
     /* these tables are both needed for symtab search and symbol stubs search */
     const struct nlist_64* nl_tbl = read_file_off(fp, macho_info->nsyms * sizeof(struct nlist_64), base_offset + macho_info->symoff);
-    const char* str_tbl = read_file_off(fp, macho_info->strsize, base_offset + macho_info->stroff);
+    const char* str_tbl = read_file_off(fp, macho_info->strtab.size, base_offset + macho_info->strtab.off);
 
-    if (macho_info->indirectsymoff != 0 && macho_info->stubs_off != 0) {
+    if (macho_info->indirectsymoff != 0 && macho_info->stubs.off != 0) {
         /* symbol stubs search */
         uint32_t entry_off = macho_info->indirectsymoff + macho_info->indirectsym_idx * sizeof(uint32_t);
-        uint64_t nstubs = macho_info->stubs_size / macho_info->stub_len;
+        uint64_t nstubs = macho_info->stubs.size / macho_info->stub_len;
         const uint32_t *indirectsym_entry = read_file_off(fp, nstubs * sizeof(uint32_t), base_offset + entry_off);
         for (int i = 0; i < nstubs; i++) {
             uint32_t nl_idx = indirectsym_entry[i];
@@ -93,7 +93,7 @@ long solve_symbol(FILE *fp, const macho_symbol_info_t *macho_info, const char* s
             }
             if (strcmp(symbol_name, str_tbl + nl_tbl[nl_idx].n_un.n_strx) == 0) {
                 /* stubs_off is direct file offset */
-                symbol_address = base_offset + macho_info->stubs_off + i * (uint64_t)macho_info->stub_len;
+                symbol_address = base_offset + macho_info->stubs.off + i * (uint64_t)macho_info->stub_len;
                 break;
             }
         }
