@@ -152,8 +152,8 @@ int main(int argc, char **argv) {
                 break;
             }
         }
-        if (patched == 1)
-            printf("1(%d) match patched\n", npoffs);
+        if (patched <= 1)
+            printf("%d(%d) match patched\n", patched, npoffs);
         else {
             if (!o_use_builtin_patch)
                 fprintf(stderr, "symp: warning, multiple arches used the same patch\n");

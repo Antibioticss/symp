@@ -18,7 +18,7 @@ static void usage() {
     puts("usage: symp [options] -- <symbol> <file>");
     puts("options:");
     puts("  -a, --arch <arch>         select an arch in the binary, supported: x86_64/arm64");
-    puts("  -p, --patch <patch>       use builtin patches, available: ret, ret0, ret1, ret2");
+    puts("  -p, --patch <patch>       use builtin patches, available: nop, ret, ret0, ret1, ret2");
     puts("  -b, --binary <binary>     use a binary file as patch");
     puts("  -x, --hex <hex string>    hex string of the patch");
     puts("  -q, --quiet               suppress match count messages");
