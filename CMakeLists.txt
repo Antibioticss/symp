@@ -25,7 +25,7 @@ add_custom_command(
 	COMMAND pkgbuild --version 1.2
 					 --identifier com.antibiotics.tools
 					 --install-location /usr/local/bin
-					 --min-os-version 10.15
+					 --min-os-version 10.13
 					 --compression latest
 					 --timestamp
 					 --root root

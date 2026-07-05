@@ -12,7 +12,7 @@ env:
   # Customize the CMake build type here (Release, Debug, RelWithDebInfo, etc.)
   BUILD_TYPE: Release
   OSX_ARCHITECTURES: x86_64;arm64
-  OSX_DEPLOYMENT_TARGET: 10.15
+  OSX_DEPLOYMENT_TARGET: 10.13
 
 jobs:
   build:
