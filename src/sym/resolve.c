@@ -57,7 +57,7 @@ static symtype_t determine_type(const char *symbol_name) {
     return REGULAR_SYMBOL;
 }
 
-bool lookup_symbol_macho(FILE *fp, const char *symbol_name, patch_off_t *poffout) {
+bool lookup_symbol_macho(FILE *fp, const char *symbol_name, patch_off_t *poffout, search_mode_t search_mode) {
     bool found = false;
     int32_t cputype = 0;
     uint32_t max_patch_len = 0;
@@ -75,7 +75,7 @@ bool lookup_symbol_macho(FILE *fp, const char *symbol_name, patch_off_t *poffout
         const macho_symbol_info_t *symbol_info = parse_symbol_info(fp);
         cputype = symbol_info->cputype;
         // max_patch_len = symbol_info->stub_len; // we don't know if the symbol is from stubs
-        symbol_address = solve_symbol(fp, symbol_info, symbol_name);
+        symbol_address = solve_symbol(fp, symbol_info, symbol_name, search_mode);
         free((void *)symbol_info);
         break;
     }

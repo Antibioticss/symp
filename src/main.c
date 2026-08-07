@@ -30,12 +30,12 @@ static char *arch2str(int32_t arch) {
     return NULL;
 }
 
-int find_symbol(FILE *fp, int offset, int32_t cputype, patch_off_t *poffs) {
+int find_symbol(FILE *fp, int offset, int32_t cputype, patch_off_t *poffs, search_mode_t search_mode) {
     int found = 0;
     if (o_patch_arch == 0 || (cputype & o_patch_arch) == cputype) {
         g_searched_arch |= cputype;
         fseek(fp, offset, SEEK_SET);
-        if (lookup_symbol_macho(fp, o_symbol, poffs))
+        if (lookup_symbol_macho(fp, o_symbol, poffs, search_mode))
             found = 1;
         else
             fprintf(stderr, "symbol not found for arch '%s'!\n", arch2str(cputype));
@@ -93,7 +93,7 @@ int main(int argc, char **argv) {
     case MH_MAGIC_64: { /* 64-bit Mach-O file */
         int32_t cputype;
         fread(&cputype, sizeof(int32_t), 1, fp);
-        npoffs += find_symbol(fp, 0, cputype, poffs);
+        npoffs += find_symbol(fp, 0, cputype, poffs, o_search_mode);
         break;
     }
     case FAT_CIGAM: { /* FAT file (on little-endian host CPU) */
@@ -105,7 +105,7 @@ int main(int argc, char **argv) {
         for (int i = 0; i < nfat_arch; i++) {
             const int32_t cputype = OSSwapInt32(archs[i].cputype);
             const int32_t offset = OSSwapInt32(archs[i].offset);
-            npoffs += find_symbol(fp, offset, cputype, poffs + npoffs);
+            npoffs += find_symbol(fp, offset, cputype, poffs + npoffs, o_search_mode);
         }
         free(archs);
         break;

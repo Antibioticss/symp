@@ -12,6 +12,7 @@ data_t o_patch_data = {0, NULL};
 bool o_use_builtin_patch = false;
 int o_builtin_idx = -1;
 bool o_quiet = false;
+search_mode_t o_search_mode = FULL_STRING_MATCH;
 
 static void usage() {
     puts("symp - Mach-O symbol patching tool");
@@ -24,6 +25,8 @@ static void usage() {
     puts("  -q, --quiet               suppress match count messages");
     puts("  -v, --version             show version number");
     puts("  -h, --help                show this usage text");
+    puts("  -r, --regexp              use regular expressions for symbol matching");
+    puts("  -s, --substring           use substring matching for symbol matching");
 }
 
 int parse_arguments(int argc, char **argv) {
@@ -36,17 +39,19 @@ int parse_arguments(int argc, char **argv) {
     uint8_t *xbuf = NULL;
     while(1) {
         static struct option long_options[] = {
-            {"arch",   required_argument, 0, 'a'},
-            {"patch",  required_argument, 0, 'p'},
-            {"binary", required_argument, 0, 'b'},
-            {"hex",    required_argument, 0, 'x'},
-            {"quiet",  no_argument, 0, 'q'},
-            {"version",no_argument, 0, 'v'},
-            {"help",   no_argument, 0, 'h'},
+            {"arch",      required_argument, 0, 'a'},
+            {"patch",     required_argument, 0, 'p'},
+            {"binary",    required_argument, 0, 'b'},
+            {"hex",       required_argument, 0, 'x'},
+            {"quiet",     no_argument, 0, 'q'},
+            {"version",   no_argument, 0, 'v'},
+            {"help",      no_argument, 0, 'h'},
+            {"regexp",    no_argument, 0, 'r'},
+            {"substring", no_argument, 0, 's'},
             {0, 0, 0, 0}
         };
         int option_index = 0;
-        int c = getopt_long(argc, argv, "a:p:b:x:qvh", long_options, &option_index);
+        int c = getopt_long(argc, argv, "a:p:b:x:qvhrs", long_options, &option_index);
         if (c == -1)
             break;
         switch (c) {
@@ -59,6 +64,20 @@ int parse_arguments(int argc, char **argv) {
                 fprintf(stderr, "symp: unsupported arch %s\n", optarg);
                 goto err;
             }
+            break;
+        case 'r':
+            if (o_search_mode == SUBSTRING_MATCH) {
+                fprintf(stderr, "symp: only one of regexp/substring can be offered\n");
+                goto err;
+            }
+            o_search_mode = REGEXP_MATCH;
+            break;
+        case 's':
+            if (o_search_mode == REGEXP_MATCH) {
+                fprintf(stderr, "symp: only one of regexp/substring can be offered\n");
+                goto err;
+            }
+            o_search_mode = SUBSTRING_MATCH;
             break;
         case 'b':
             if (xbuf || o_use_builtin_patch) {

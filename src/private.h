@@ -15,6 +15,12 @@ typedef enum {
 	PATCH_MODE
 } work_mode_t;
 
+typedef enum {
+	FULL_STRING_MATCH,
+	SUBSTRING_MATCH,
+	REGEXP_MATCH
+} search_mode_t;
+
 typedef struct {
 	size_t len;
     uint8_t *buf;
@@ -31,6 +37,7 @@ extern int builtin_patches_count;
 
 /* (o)ptions, defined in cli.c */
 extern work_mode_t o_mode;
+extern search_mode_t o_search_mode;
 extern char *o_symbol, *o_file;
 extern int o_patch_arch;
 extern data_t o_patch_data;

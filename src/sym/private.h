@@ -1,6 +1,8 @@
 #ifndef SYM_PRIVATE
 #define SYM_PRIVATE
 
+#include "../private.h"
+
 #include <stdio.h>
 #include <stdint.h>
 #include <stdbool.h>
@@ -81,7 +83,7 @@ macho_symbol_info_t *parse_symbol_info(FILE *fp);
 macho_objc_info_t *parse_objc_info(FILE *fp);
 
 /* defined in symbol.c */
-long solve_symbol(FILE *fp, const macho_symbol_info_t *macho_info, const char* symbol_name);
+long solve_symbol(FILE *fp, const macho_symbol_info_t *macho_info, const char* symbol_name, search_mode_t search_mode);
 
 /* defined in objcmeta.c */
 long solve_objc_symbol(FILE *fp, const macho_objc_info_t *mi, const char* symbol_name);
