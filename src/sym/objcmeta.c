@@ -63,12 +63,30 @@ struct relative_method {
 };
 
 void seperate_method(const char *symbol_name, char **class_name, char **sel_name) {
-    /* assume this is valid */
+    if (symbol_name == NULL || symbol_name[0] == '\0') {
+        *class_name = strdup("");
+        *sel_name = strdup("");
+        return;
+    }
+
     char *split = strchr(symbol_name, ' ');
-    size_t cls_len = split - symbol_name - 2; /* remove '-[' */
+    if (split == NULL || split[1] == '\0') {
+        *class_name = strdup(symbol_name);
+        *sel_name = strdup(symbol_name);
+        return;
+    }
+
+    size_t cls_len = (size_t)(split - symbol_name - 2); /* remove '-[' */
     size_t sel_len = strlen(symbol_name) - cls_len - 4; /* remove '-[ ]' */
     char *clsn = malloc(cls_len + 1);
     char *seln = malloc(sel_len + 1);
+    if (clsn == NULL || seln == NULL) {
+        free(clsn);
+        free(seln);
+        *class_name = strdup("");
+        *sel_name = strdup("");
+        return;
+    }
     strncpy(clsn, symbol_name + 2, cls_len);
     strncpy(seln, split + 1, sel_len);
     clsn[cls_len] = '\0';
@@ -119,8 +137,25 @@ uint64_t solve_methodlist(const char *sym_sel, const struct method_list *method_
     return 0;
 }
 
-long solve_objc_symbol(FILE *fp, const macho_objc_info_t *mi, const char* symbol_name) {
-    uint64_t symbol_address = 0;
+static void add_objc_match(symbol_matches_t *out, uint64_t addr, const char *class_name,
+                            const char *method_name, const char *pattern, search_mode_t mode,
+                            search_case_t search_case, const regex_t *preg, char prefix) {
+    char method_symbol[4096];
+    int written = snprintf(method_symbol, sizeof(method_symbol), "%c[%s %s]",
+                           prefix, class_name, method_name);
+    if (written < 0 || (size_t)written >= sizeof(method_symbol))
+        return;
+
+    if (match_symbol(method_symbol, pattern, mode, search_case, preg) ||
+        match_symbol(class_name, pattern, mode, search_case, preg) ||
+        match_symbol(method_name, pattern, mode, search_case, preg)) {
+        symbol_matches_push(out, addr, method_symbol);
+    }
+}
+
+size_t solve_objc_symbol(FILE *fp, const macho_objc_info_t *mi, const char* symbol_name,
+                         search_mode_t search_mode, search_case_t search_case, symbol_matches_t *out) {
+    size_t before = out->count;
     const long base_offset = mi->base_offset;
 
     if (mi->objc_classlist.off == 0) {
@@ -132,6 +167,18 @@ long solve_objc_symbol(FILE *fp, const macho_objc_info_t *mi, const char* symbol
     char *sym_cls, *sym_sel;
     seperate_method(symbol_name, &sym_cls, &sym_sel);
 
+    regex_t preg;
+    bool preg_compiled = false;
+    if (search_mode == REGEXP_MATCH) {
+        if (!compile_regex(&preg, symbol_name, search_case)) {
+            fprintf(stderr, "Could not compile regex: %s\n", symbol_name);
+            free(sym_cls);
+            free(sym_sel);
+            return 0;
+        }
+        preg_compiled = true;
+    }
+
     void *macho_data = read_file_off(fp, mi->data_vm.off + mi->data_vm.size, base_offset);
 
     uint64_t *classlist = macho_data + mi->objc_classlist.off;
@@ -142,39 +189,69 @@ long solve_objc_symbol(FILE *fp, const macho_objc_info_t *mi, const char* symbol
             objc_cls = macho_data + vm2fileoff(objc_cls->isaVMAddr & ISA_MASK, mi);
         struct class_ro *class_data = macho_data + vm2fileoff(objc_cls->dataVMAddrAndFastFlags & FAST_DATA_MASK, mi);
         char *class_name = macho_data + vm2fileoff(class_data->nameVMAddr & ISA_MASK, mi);
-        if (strcmp(class_name, sym_cls) != 0)
-            continue;
         if (class_data->baseMethodsVMAddr != 0) {
             struct method_list *method_list = macho_data + vm2fileoff(class_data->baseMethodsVMAddr & ISA_MASK, mi);
-            uint64_t method_imp_off = solve_methodlist(sym_sel, method_list, mi, macho_data);
-            if (method_imp_off != 0)
-                symbol_address = base_offset + method_imp_off;
+            for (int j = 0; j < method_list->count; j++) {
+                char *method_name = NULL;
+                uint64_t method_imp_off = 0;
+                void *cur_method = (void *)(method_list + 1) + j * (method_list->entsize & 0x0000FFFC);
+                if ((method_list->entsize & 0x80000000) != 0) { /* usesRelativeOffsets */
+                    struct relative_method *rel_method = cur_method;
+                    uint64_t *method_sel = (void *)rel_method + offsetof(struct relative_method, nameOffset) + rel_method->nameOffset;
+                    method_name = macho_data + vm2fileoff(*method_sel & ISA_MASK, mi);
+                    method_imp_off = (uint64_t)rel_method - (uint64_t)macho_data + offsetof(struct relative_method, impOffset) + rel_method->impOffset;
+                }
+                else {
+                    struct method *method = cur_method;
+                    method_name = macho_data + vm2fileoff(method->nameVMAddr & ISA_MASK, mi);
+                    method_imp_off = vm2fileoff(method->impVMAddr & ISA_MASK, mi);
+                }
+                if (method_imp_off != 0) {
+                    add_objc_match(out, base_offset + method_imp_off, class_name, method_name,
+                                   symbol_name, search_mode, search_case, preg_compiled ? &preg : NULL,
+                                   sym_type);
+                }
+            }
         }
-        break; /* class name already matched */
     }
-    if (symbol_address != 0)
-        goto exit;
 
     uint64_t *catlist = macho_data + mi->objc_catlist.off;
     uint64_t ncategories = mi->objc_catlist.size / sizeof(uint64_t);
     for (int i = 0; i < ncategories; i++) {
         struct objc_category *objc_cat = macho_data + vm2fileoff(catlist[i] & ISA_MASK, mi);
         char *cat_name = macho_data + vm2fileoff(objc_cat->nameVMAddr & ISA_MASK, mi);
-        if (strcmp(cat_name, sym_cls) != 0)
-            continue;
         uint64_t method_vmaddr = sym_type == '+' ? objc_cat->classMethodsVMAddr: objc_cat->instanceMethodsVMAddr;
         if (method_vmaddr != 0) {
             struct method_list *method_list = macho_data + vm2fileoff(method_vmaddr & ISA_MASK, mi);
-            uint64_t method_imp_off = solve_methodlist(sym_sel, method_list, mi, macho_data);
-            if (method_imp_off != 0)
-                symbol_address = base_offset + method_imp_off;
+            for (int j = 0; j < method_list->count; j++) {
+                char *method_name = NULL;
+                uint64_t method_imp_off = 0;
+                void *cur_method = (void *)(method_list + 1) + j * (method_list->entsize & 0x0000FFFC);
+                if ((method_list->entsize & 0x80000000) != 0) { /* usesRelativeOffsets */
+                    struct relative_method *rel_method = cur_method;
+                    uint64_t *method_sel = (void *)rel_method + offsetof(struct relative_method, nameOffset) + rel_method->nameOffset;
+                    method_name = macho_data + vm2fileoff(*method_sel & ISA_MASK, mi);
+                    method_imp_off = (uint64_t)rel_method - (uint64_t)macho_data + offsetof(struct relative_method, impOffset) + rel_method->impOffset;
+                }
+                else {
+                    struct method *method = cur_method;
+                    method_name = macho_data + vm2fileoff(method->nameVMAddr & ISA_MASK, mi);
+                    method_imp_off = vm2fileoff(method->impVMAddr & ISA_MASK, mi);
+                }
+                if (method_imp_off != 0) {
+                    add_objc_match(out, base_offset + method_imp_off, cat_name, method_name,
+                                   symbol_name, search_mode, search_case, preg_compiled ? &preg : NULL,
+                                   sym_type);
+                }
+            }
         }
-        break; /* class name already matched */
     }
 
-exit:
+    if (preg_compiled) {
+        regfree(&preg);
+    }
     free(sym_cls);
     free(sym_sel);
     free((void *)macho_data);
-    return (long)symbol_address;
+    return out->count - before;
 }

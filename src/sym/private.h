@@ -104,6 +104,7 @@ size_t solve_symbol(FILE *fp, const macho_symbol_info_t *macho_info, const char 
                     search_mode_t search_mode, search_case_t search_case, symbol_matches_t *out);
 
 /* defined in objcmeta.c */
-long solve_objc_symbol(FILE *fp, const macho_objc_info_t *mi, const char* symbol_name);
+size_t solve_objc_symbol(FILE *fp, const macho_objc_info_t *mi, const char* symbol_name,
+                         search_mode_t search_mode, search_case_t search_case, symbol_matches_t *out);
 
 #endif
