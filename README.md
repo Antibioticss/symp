@@ -84,6 +84,11 @@ Category in `ObjC` is supported, but note that **Category name** should be used 
 | `-x`/`--hex`    | use hex data as the patch (case-insensitive; spaces allowed) | `-x "C0 03 5F D6"` |
 | `-a`/`--arch`   | select an arch in a `FAT` file; currently supports `x86_64` and `arm64` | `-a arm64`         |
 | `-q`/`--quiet`  | suppress match count messages (useful for command substitution) | `-q`               |
+| `-r`/`--regexp` | use regular-expression matching for symbol lookup | `-r`               |
+| `-s`/`--substring` | use substring matching for symbol lookup | `-s`               |
+| `-i`/`--ignore-case` | make symbol lookup case-insensitive | `-i`               |
+| `-c`/`--case-sensitive` | make symbol lookup case-sensitive (default) | `-c`               |
+| `--vmaddr`         | print addresses as architecture-relative offsets instead of file offsets | `--vmaddr`           |
 
 Only one of `-p`, `-b`, or `-x` may be specified. If none is provided, the tool prints the symbol's file offset.
 
