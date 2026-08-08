@@ -82,8 +82,18 @@ macho_symbol_info_t *parse_symbol_info(FILE *fp);
 
 macho_objc_info_t *parse_objc_info(FILE *fp);
 
+typedef struct {
+    uint64_t *addrs;
+    size_t count;
+    size_t capacity;
+} symbol_matches_t;
+
+void symbol_matches_init(symbol_matches_t *m);
+void symbol_matches_free(symbol_matches_t *m);
+
 /* defined in symbol.c */
-long solve_symbol(FILE *fp, const macho_symbol_info_t *macho_info, const char* symbol_name, search_mode_t search_mode);
+size_t solve_symbol(FILE *fp, const macho_symbol_info_t *macho_info, const char *symbol_name,
+                    search_mode_t search_mode, symbol_matches_t *out);
 
 /* defined in objcmeta.c */
 long solve_objc_symbol(FILE *fp, const macho_objc_info_t *mi, const char* symbol_name);

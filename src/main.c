@@ -30,17 +30,15 @@ static char *arch2str(int32_t arch) {
     return NULL;
 }
 
-int find_symbol(FILE *fp, int offset, int32_t cputype, patch_off_t *poffs, search_mode_t search_mode) {
-    int found = 0;
+int find_symbol(FILE *fp, int offset, int32_t cputype, patch_off_list_t *poffs, search_mode_t search_mode) {
+    size_t before = poffs->count;
     if (o_patch_arch == 0 || (cputype & o_patch_arch) == cputype) {
         g_searched_arch |= cputype;
         fseek(fp, offset, SEEK_SET);
-        if (lookup_symbol_macho(fp, o_symbol, poffs, search_mode))
-            found = 1;
-        else
+        if (lookup_symbol_macho(fp, o_symbol, poffs, search_mode) == 0)
             fprintf(stderr, "symbol not found for arch '%s'!\n", arch2str(cputype));
     }
-    return found;
+    return (int)(poffs->count - before);
 }
 
 int patch_file(FILE* fp, patch_off_t poff) {
@@ -75,8 +73,8 @@ int main(int argc, char **argv) {
     if (o_mode == USAGE_MODE)
         return 0; /* already printed */
 
-    int npoffs = 0;
-    patch_off_t poffs[2]; /* only two archs are supported currently */
+    patch_off_list_t poffs;
+    patch_off_list_init(&poffs);
 
     char *fmode = "rb";
     if (o_mode == PATCH_MODE)
@@ -93,7 +91,7 @@ int main(int argc, char **argv) {
     case MH_MAGIC_64: { /* 64-bit Mach-O file */
         int32_t cputype;
         fread(&cputype, sizeof(int32_t), 1, fp);
-        npoffs += find_symbol(fp, 0, cputype, poffs, o_search_mode);
+        find_symbol(fp, 0, cputype, &poffs, o_search_mode);
         break;
     }
     case FAT_CIGAM: { /* FAT file (on little-endian host CPU) */
@@ -105,7 +103,7 @@ int main(int argc, char **argv) {
         for (int i = 0; i < nfat_arch; i++) {
             const int32_t cputype = OSSwapInt32(archs[i].cputype);
             const int32_t offset = OSSwapInt32(archs[i].offset);
-            npoffs += find_symbol(fp, offset, cputype, poffs + npoffs, o_search_mode);
+            find_symbol(fp, offset, cputype, &poffs, o_search_mode);
         }
         free(archs);
         break;
@@ -126,38 +124,37 @@ int main(int argc, char **argv) {
         goto err_ret;
     }
 
-    if (npoffs == 0) {
+    if (poffs.count == 0) {
         error = 1;
         printf("no matches found!\n");
         goto err_ret;
     }
 
     if (o_mode == LOOKUP_MODE) {
-        for (int i = 0; i < npoffs; i++) {
-            printf("0x%lx\n", poffs[i].fileoff);
+        for (size_t i = 0; i < poffs.count; i++) {
+            printf("0x%lx\n", poffs.items[i].fileoff);
         }
         if (!o_quiet) {
-            // one match for an arch at most
-            if (npoffs == 1)
+            if (poffs.count == 1)
                 printf("1 match found\n");
             else
-                printf("%d matches found\n", npoffs);
+                printf("%zu matches found\n", poffs.count);
         }
     }
     else if (o_mode == PATCH_MODE) {
         int patched = 0;
-        for (; patched < npoffs; patched++) {
-            if (patch_file(fp, poffs[patched]) != 0) {
+        for (; patched < (int)poffs.count; patched++) {
+            if (patch_file(fp, poffs.items[patched]) != 0) {
                 error = 1;
                 break;
             }
         }
         if (patched <= 1)
-            printf("%d(%d) match patched\n", patched, npoffs);
+            printf("%d(%zu) match patched\n", patched, poffs.count);
         else {
             if (!o_use_builtin_patch)
                 fprintf(stderr, "symp: warning, multiple arches used the same patch\n");
-            printf("%d(%d) matches patched\n", patched, npoffs);
+            printf("%d(%zu) matches patched\n", patched, poffs.count);
         }
     }
     else {
@@ -166,6 +163,7 @@ int main(int argc, char **argv) {
     }
 
 err_ret:
+    patch_off_list_free(&poffs);
     fclose(fp);
     free(o_patch_data.buf);
     return error;
