@@ -2,6 +2,7 @@
 
 #include <stdlib.h>
 
+
 void *read_file(FILE *fp, const size_t len) {
     void *data = malloc(len);
     if (fread(data, len, 1, fp) != 1) {
@@ -11,6 +12,7 @@ void *read_file(FILE *fp, const size_t len) {
     }
     return data;
 }
+
 
 void *read_file_off(FILE *fp, const size_t len, const long int offset) {
     fseek(fp, offset, SEEK_SET);
