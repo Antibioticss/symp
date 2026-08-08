@@ -13,6 +13,7 @@ bool o_use_builtin_patch = false;
 int o_builtin_idx = -1;
 bool o_quiet = false;
 search_mode_t o_search_mode = FULL_STRING_MATCH;
+search_case_t o_search_case = SEARCH_CASE_SENSITIVE;
 
 static void usage() {
     puts("symp - Mach-O symbol patching tool");
@@ -27,6 +28,8 @@ static void usage() {
     puts("  -h, --help                show this usage text");
     puts("  -r, --regexp              use regular expressions for symbol matching");
     puts("  -s, --substring           use substring matching for symbol matching");
+    puts("  -i, --ignore-case         case-insensitive symbol matching");
+    puts("  -c, --case-sensitive      case-sensitive symbol matching (default)");
 }
 
 int parse_arguments(int argc, char **argv) {
@@ -37,6 +40,7 @@ int parse_arguments(int argc, char **argv) {
 
     size_t xlen = 0;
     uint8_t *xbuf = NULL;
+    bool case_option_set = false;
     while(1) {
         static struct option long_options[] = {
             {"arch",      required_argument, 0, 'a'},
@@ -48,10 +52,12 @@ int parse_arguments(int argc, char **argv) {
             {"help",      no_argument, 0, 'h'},
             {"regexp",    no_argument, 0, 'r'},
             {"substring", no_argument, 0, 's'},
+            {"ignore-case", no_argument, 0, 'i'},
+            {"case-sensitive", no_argument, 0, 'c'},
             {0, 0, 0, 0}
         };
         int option_index = 0;
-        int c = getopt_long(argc, argv, "a:p:b:x:qvhrs", long_options, &option_index);
+        int c = getopt_long(argc, argv, "a:p:b:x:qvhrsci", long_options, &option_index);
         if (c == -1)
             break;
         switch (c) {
@@ -78,6 +84,22 @@ int parse_arguments(int argc, char **argv) {
                 goto err;
             }
             o_search_mode = SUBSTRING_MATCH;
+            break;
+        case 'i':
+            if (case_option_set) {
+                fprintf(stderr, "symp: only one of ignore-case/case-sensitive can be offered\n");
+                goto err;
+            }
+            o_search_case = SEARCH_CASE_INSENSITIVE;
+            case_option_set = true;
+            break;
+        case 'c':
+            if (case_option_set) {
+                fprintf(stderr, "symp: only one of ignore-case/case-sensitive can be offered\n");
+                goto err;
+            }
+            o_search_case = SEARCH_CASE_SENSITIVE;
+            case_option_set = true;
             break;
         case 'b':
             if (xbuf || o_use_builtin_patch) {

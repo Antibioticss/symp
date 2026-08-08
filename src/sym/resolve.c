@@ -94,7 +94,7 @@ static void append_match(patch_off_list_t *out, int32_t cputype, uint32_t max_pa
 }
 
 size_t lookup_symbol_macho(FILE *fp, const char *symbol_name, patch_off_list_t *out,
-                           search_mode_t search_mode) {
+                           search_mode_t search_mode, search_case_t search_case) {
     size_t before = out->count;
     int32_t cputype = 0;
     uint32_t max_patch_len = 0;
@@ -114,7 +114,7 @@ size_t lookup_symbol_macho(FILE *fp, const char *symbol_name, patch_off_list_t *
 
         cputype = symbol_info->cputype;
         symbol_matches_init(&matches);
-        solve_symbol(fp, symbol_info, symbol_name, search_mode, &matches);
+        solve_symbol(fp, symbol_info, symbol_name, search_mode, search_case, &matches);
         for (size_t i = 0; i < matches.count; i++) {
             append_match(out, cputype, max_patch_len, matches.addrs[i]);
         }

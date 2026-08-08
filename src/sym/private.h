@@ -93,7 +93,7 @@ void symbol_matches_free(symbol_matches_t *m);
 
 /* defined in symbol.c */
 size_t solve_symbol(FILE *fp, const macho_symbol_info_t *macho_info, const char *symbol_name,
-                    search_mode_t search_mode, symbol_matches_t *out);
+                    search_mode_t search_mode, search_case_t search_case, symbol_matches_t *out);
 
 /* defined in objcmeta.c */
 long solve_objc_symbol(FILE *fp, const macho_objc_info_t *mi, const char* symbol_name);

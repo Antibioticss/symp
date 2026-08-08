@@ -26,6 +26,6 @@ void patch_off_list_free(patch_off_list_t *list);
  * fp -> start of macho file
  */
 size_t lookup_symbol_macho(FILE *fp, const char *symbol_name, patch_off_list_t *out,
-                           search_mode_t search_mode);
+                           search_mode_t search_mode, search_case_t search_case);
 
 #endif

@@ -21,6 +21,11 @@ typedef enum {
 	REGEXP_MATCH
 } search_mode_t;
 
+typedef enum {
+	SEARCH_CASE_SENSITIVE,
+	SEARCH_CASE_INSENSITIVE
+} search_case_t;
+
 typedef struct {
 	size_t len;
     uint8_t *buf;
@@ -38,6 +43,7 @@ extern int builtin_patches_count;
 /* (o)ptions, defined in cli.c */
 extern work_mode_t o_mode;
 extern search_mode_t o_search_mode;
+extern search_case_t o_search_case;
 extern char *o_symbol, *o_file;
 extern int o_patch_arch;
 extern data_t o_patch_data;

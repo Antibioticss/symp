@@ -3,6 +3,7 @@
 
 #include <stdio.h>
 #include <string.h>
+#include <strings.h>
 #include <stdint.h>
 #include <stdlib.h>
 #include <stdbool.h>
@@ -48,7 +49,19 @@ static uint64_t read_uleb128(const uint8_t **p) {
     return result;
 }
 
-static uint64_t trie_query(const uint8_t *export, const char *name) {
+static bool str_equals(const char *a, const char *b, search_case_t search_case) {
+    if (search_case == SEARCH_CASE_INSENSITIVE)
+        return strcasecmp(a, b) == 0;
+    return strcmp(a, b) == 0;
+}
+
+static bool str_contains(const char *haystack, const char *needle, search_case_t search_case) {
+    if (search_case == SEARCH_CASE_INSENSITIVE)
+        return strcasestr(haystack, needle) != NULL;
+    return strstr(haystack, needle) != NULL;
+}
+
+static uint64_t trie_query(const uint8_t *export, const char *name, search_case_t search_case) {
     // documents in <mach-o/loader.h>
     uint64_t symbol_address = 0;
     uint64_t node_off = 0;
@@ -76,7 +89,14 @@ static uint64_t trie_query(const uint8_t *export, const char *name) {
                 size_t cur_len = strlen(cur_str);
                 cur_pos += cur_len + 1;
                 uint64_t next_off = read_uleb128(&cur_pos);
-                if (strncmp(rest_name, cur_str, cur_len) == 0) {
+                if (search_case == SEARCH_CASE_INSENSITIVE) {
+                    if (strncasecmp(rest_name, cur_str, cur_len) == 0) {
+                        go_child = true;
+                        rest_name += cur_len;
+                        node_off = next_off;
+                        break;
+                    }
+                } else if (strncmp(rest_name, cur_str, cur_len) == 0) {
                     /* this edge matched the symbol */
                     go_child = true;
                     rest_name += cur_len;
@@ -91,7 +111,8 @@ static uint64_t trie_query(const uint8_t *export, const char *name) {
 
 static void trie_dfs_substring(const uint8_t *export, uint64_t node_off,
                                char *buf, size_t buf_len, const char *substr,
-                               uint64_t base_offset, symbol_matches_t *out) {
+                               uint64_t base_offset, search_case_t search_case,
+                               symbol_matches_t *out) {
     const uint8_t *cur_pos = export + node_off;
     uint64_t info_len = read_uleb128(&cur_pos);
     const uint8_t *child_off = cur_pos + info_len;
@@ -100,7 +121,7 @@ static void trie_dfs_substring(const uint8_t *export, uint64_t node_off,
         uint64_t flag = read_uleb128(&cur_pos);
         if (flag == EXPORT_SYMBOL_FLAGS_KIND_REGULAR) {
             uint64_t addr = read_uleb128(&cur_pos);
-            if (strstr(buf, substr) != NULL) {
+            if (str_contains(buf, substr, search_case)) {
                 symbol_matches_push(out, base_offset + addr);
             }
         }
@@ -118,7 +139,8 @@ static void trie_dfs_substring(const uint8_t *export, uint64_t node_off,
             memcpy(buf + buf_len, edge_str, edge_len);
             buf[buf_len + edge_len] = '\0';
 
-            trie_dfs_substring(export, next_off, buf, buf_len + edge_len, substr, base_offset, out);
+            trie_dfs_substring(export, next_off, buf, buf_len + edge_len, substr, base_offset,
+                               search_case, out);
         }
     }
 
@@ -161,12 +183,13 @@ static void trie_dfs_regexp(const uint8_t *export, uint64_t node_off,
     buf[buf_len] = '\0';
 }
 
-static bool match_symbol(const char *string, const char *pattern, search_mode_t mode, const regex_t *preg) {
+static bool match_symbol(const char *string, const char *pattern, search_mode_t mode,
+                         search_case_t search_case, const regex_t *preg) {
     switch (mode) {
     case FULL_STRING_MATCH:
-        return strcmp(string, pattern) == 0;
+        return str_equals(string, pattern, search_case);
     case SUBSTRING_MATCH:
-        return strstr(string, pattern) != NULL;
+        return str_contains(string, pattern, search_case);
     case REGEXP_MATCH:
         return regexec(preg, string, 0, NULL, 0) == 0;
     default:
@@ -175,7 +198,7 @@ static bool match_symbol(const char *string, const char *pattern, search_mode_t 
 }
 
 size_t solve_symbol(FILE *fp, const macho_symbol_info_t *macho_info, const char *symbol_name,
-                    search_mode_t search_mode, symbol_matches_t *out) {
+                    search_mode_t search_mode, search_case_t search_case, symbol_matches_t *out) {
     size_t before = out->count;
     const long base_offset = macho_info->base_offset;
 
@@ -183,7 +206,10 @@ size_t solve_symbol(FILE *fp, const macho_symbol_info_t *macho_info, const char 
     bool preg_compiled = false;
 
     if (search_mode == REGEXP_MATCH) {
-        if (regcomp(&preg, symbol_name, REG_EXTENDED | REG_ENHANCED | REG_NOSUB) != 0) {
+        int regflags = REG_EXTENDED | REG_ENHANCED | REG_NOSUB;
+        if (search_case == SEARCH_CASE_INSENSITIVE)
+            regflags |= REG_ICASE;
+        if (regcomp(&preg, symbol_name, regflags) != 0) {
             fprintf(stderr, "Could not compile regex: %s\n", symbol_name);
             return 0;
         }
@@ -195,7 +221,7 @@ size_t solve_symbol(FILE *fp, const macho_symbol_info_t *macho_info, const char 
         uint8_t *export_trie = read_file_off(fp, macho_info->export.size, base_offset + macho_info->export.off);
 
         if (search_mode == FULL_STRING_MATCH) {
-            uint64_t addr = trie_query(export_trie, symbol_name);
+            uint64_t addr = trie_query(export_trie, symbol_name, search_case);
             if (addr != 0) {
                 symbol_matches_push(out, base_offset + addr);
                 free(export_trie);
@@ -204,7 +230,7 @@ size_t solve_symbol(FILE *fp, const macho_symbol_info_t *macho_info, const char 
         } else {
             char buf[4096] = {0};
             if (search_mode == SUBSTRING_MATCH) {
-                trie_dfs_substring(export_trie, 0, buf, 0, symbol_name, base_offset, out);
+                trie_dfs_substring(export_trie, 0, buf, 0, symbol_name, base_offset, search_case, out);
             } else if (search_mode == REGEXP_MATCH) {
                 trie_dfs_regexp(export_trie, 0, buf, 0, &preg, base_offset, out);
             }
@@ -231,7 +257,7 @@ size_t solve_symbol(FILE *fp, const macho_symbol_info_t *macho_info, const char 
             }
             const char *current_symbol = str_tbl + nl_tbl[nl_idx].n_un.n_strx;
 
-            if (match_symbol(current_symbol, symbol_name, search_mode, &preg)) {
+            if (match_symbol(current_symbol, symbol_name, search_mode, search_case, &preg)) {
                 uint64_t addr = base_offset + macho_info->stubs.off + i * (uint64_t)macho_info->stub_len;
                 if (search_mode == FULL_STRING_MATCH) {
                     symbol_matches_push(out, addr);
@@ -251,7 +277,7 @@ size_t solve_symbol(FILE *fp, const macho_symbol_info_t *macho_info, const char 
                 continue;
             const char *current_symbol = str_tbl + nl_tbl[i].n_un.n_strx;
 
-            if (match_symbol(current_symbol, symbol_name, search_mode, &preg)) {
+            if (match_symbol(current_symbol, symbol_name, search_mode, search_case, &preg)) {
                 uint64_t addr = base_offset + macho_info->vm_slide + nl_tbl[i].n_value;
                 if (search_mode == FULL_STRING_MATCH) {
                     symbol_matches_push(out, addr);
