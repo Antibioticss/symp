@@ -26,6 +26,11 @@ void symbol_matches_free(symbol_matches_t *m) {
 }
 
 void symbol_matches_push(symbol_matches_t *m, uint64_t addr, const char *name) {
+    for (size_t i = 0; i < m->count; i++) {
+        if (m->addrs[i] == addr)
+            return;
+    }
+
     if (m->count == m->capacity) {
         size_t new_cap = m->capacity == 0 ? SYMBOL_MATCHES_INIT_CAP : m->capacity * 2;
         uint64_t *new_addrs = realloc(m->addrs, new_cap * sizeof(uint64_t));

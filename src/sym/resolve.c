@@ -26,6 +26,11 @@ void patch_off_list_free(patch_off_list_t *list) {
 }
 
 static void patch_off_list_push(patch_off_list_t *list, patch_off_t poff) {
+    for (size_t i = 0; i < list->count; i++) {
+        if (list->items[i].cputype == poff.cputype && list->items[i].fileoff == poff.fileoff)
+            return;
+    }
+
     if (list->count == list->capacity) {
         size_t new_cap = list->capacity == 0 ? PATCH_OFF_LIST_INIT_CAP : list->capacity * 2;
         patch_off_t *new_items = realloc(list->items, new_cap * sizeof(patch_off_t));
