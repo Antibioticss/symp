@@ -84,6 +84,7 @@ macho_objc_info_t *parse_objc_info(FILE *fp);
 
 typedef struct {
     uint64_t *addrs;
+    char **names;
     size_t count;
     size_t capacity;
 } symbol_matches_t;

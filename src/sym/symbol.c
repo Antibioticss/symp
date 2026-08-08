@@ -15,27 +15,39 @@ static const size_t SYMBOL_MATCHES_INIT_CAP = 16;
 
 void symbol_matches_init(symbol_matches_t *m) {
     m->addrs = NULL;
+    m->names = NULL;
     m->count = 0;
     m->capacity = 0;
 }
 
 void symbol_matches_free(symbol_matches_t *m) {
+    if (m->names != NULL) {
+        for (size_t i = 0; i < m->count; i++)
+            free(m->names[i]);
+    }
     free(m->addrs);
+    free(m->names);
     symbol_matches_init(m);
 }
 
-static void symbol_matches_push(symbol_matches_t *m, uint64_t addr) {
+static void symbol_matches_push(symbol_matches_t *m, uint64_t addr, const char *name) {
     if (m->count == m->capacity) {
         size_t new_cap = m->capacity == 0 ? SYMBOL_MATCHES_INIT_CAP : m->capacity * 2;
         uint64_t *new_addrs = realloc(m->addrs, new_cap * sizeof(uint64_t));
-        if (new_addrs == NULL) {
+        char **new_names = realloc(m->names, new_cap * sizeof(char *));
+        if (new_addrs == NULL || new_names == NULL) {
             fprintf(stderr, "symp: out of memory while collecting symbol matches\n");
+            free(new_addrs);
+            free(new_names);
             return;
         }
         m->addrs = new_addrs;
+        m->names = new_names;
         m->capacity = new_cap;
     }
-    m->addrs[m->count++] = addr;
+    m->addrs[m->count] = addr;
+    m->names[m->count] = name ? strdup(name) : NULL;
+    m->count++;
 }
 
 static uint64_t read_uleb128(const uint8_t **p) {
@@ -122,7 +134,7 @@ static void trie_dfs_substring(const uint8_t *export, uint64_t node_off,
         if (flag == EXPORT_SYMBOL_FLAGS_KIND_REGULAR) {
             uint64_t addr = read_uleb128(&cur_pos);
             if (str_contains(buf, substr, search_case)) {
-                symbol_matches_push(out, base_offset + addr);
+                symbol_matches_push(out, base_offset + addr, buf);
             }
         }
     }
@@ -159,7 +171,7 @@ static void trie_dfs_regexp(const uint8_t *export, uint64_t node_off,
         if (flag == EXPORT_SYMBOL_FLAGS_KIND_REGULAR) {
             uint64_t addr = read_uleb128(&cur_pos);
             if (regexec(preg, buf, 0, NULL, 0) == 0) {
-                symbol_matches_push(out, base_offset + addr);
+                symbol_matches_push(out, base_offset + addr, buf);
             }
         }
     }
@@ -223,7 +235,7 @@ size_t solve_symbol(FILE *fp, const macho_symbol_info_t *macho_info, const char 
         if (search_mode == FULL_STRING_MATCH) {
             uint64_t addr = trie_query(export_trie, symbol_name, search_case);
             if (addr != 0) {
-                symbol_matches_push(out, base_offset + addr);
+                symbol_matches_push(out, base_offset + addr, NULL);
                 free(export_trie);
                 goto ret;
             }
@@ -260,11 +272,11 @@ size_t solve_symbol(FILE *fp, const macho_symbol_info_t *macho_info, const char 
             if (match_symbol(current_symbol, symbol_name, search_mode, search_case, &preg)) {
                 uint64_t addr = base_offset + macho_info->stubs.off + i * (uint64_t)macho_info->stub_len;
                 if (search_mode == FULL_STRING_MATCH) {
-                    symbol_matches_push(out, addr);
+                    symbol_matches_push(out, addr, NULL);
                     free((void *)indirectsym_entry);
                     goto sym_ret;
                 }
-                symbol_matches_push(out, addr);
+                symbol_matches_push(out, addr, current_symbol);
             }
         }
         free((void *)indirectsym_entry);
@@ -280,10 +292,10 @@ size_t solve_symbol(FILE *fp, const macho_symbol_info_t *macho_info, const char 
             if (match_symbol(current_symbol, symbol_name, search_mode, search_case, &preg)) {
                 uint64_t addr = base_offset + macho_info->vm_slide + nl_tbl[i].n_value;
                 if (search_mode == FULL_STRING_MATCH) {
-                    symbol_matches_push(out, addr);
+                    symbol_matches_push(out, addr, NULL);
                     goto sym_ret;
                 }
-                symbol_matches_push(out, addr);
+                symbol_matches_push(out, addr, current_symbol);
             }
         }
     }

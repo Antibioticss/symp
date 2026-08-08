@@ -30,6 +30,42 @@ static char *arch2str(int32_t arch) {
     return NULL;
 }
 
+static const char *search_mode_label(search_mode_t mode) {
+    switch (mode) {
+    case FULL_STRING_MATCH: return "exact match";
+    case SUBSTRING_MATCH:     return "substring";
+    case REGEXP_MATCH:        return "regular expression";
+    }
+    return "unknown";
+}
+
+static const char *search_case_label(search_case_t search_case) {
+    return search_case == SEARCH_CASE_INSENSITIVE ? "case-insensitive" : "case-sensitive";
+}
+
+static void print_search_info(search_mode_t search_mode, search_case_t search_case) {
+    printf("search mode: %s (%s)\n", search_mode_label(search_mode), search_case_label(search_case));
+}
+
+static void print_lookup_results(const patch_off_list_t *poffs, search_mode_t search_mode) {
+    bool show_symbol_names = search_mode != FULL_STRING_MATCH;
+
+    for (size_t i = 0; i < poffs->count; i++) {
+        const patch_off_t *poff = &poffs->items[i];
+        if (show_symbol_names && poff->symbol_name != NULL)
+            printf("0x%lx: %s\n", poff->fileoff, poff->symbol_name);
+        else
+            printf("0x%lx\n", poff->fileoff);
+    }
+}
+
+static void print_lookup_summary(size_t count) {
+    if (count == 1)
+        printf("1 match found\n");
+    else
+        printf("%zu matches found\n", count);
+}
+
 int find_symbol(FILE *fp, int offset, int32_t cputype, patch_off_list_t *poffs,
                 search_mode_t search_mode, search_case_t search_case) {
     size_t before = poffs->count;
@@ -127,19 +163,19 @@ int main(int argc, char **argv) {
 
     if (poffs.count == 0) {
         error = 1;
-        printf("no matches found!\n");
+        if (!o_quiet)
+            printf("no matches found!\n");
         goto err_ret;
     }
 
     if (o_mode == LOOKUP_MODE) {
-        for (size_t i = 0; i < poffs.count; i++) {
-            printf("0x%lx\n", poffs.items[i].fileoff);
-        }
-        if (!o_quiet) {
-            if (poffs.count == 1)
-                printf("1 match found\n");
-            else
-                printf("%zu matches found\n", poffs.count);
+        if (o_quiet) {
+            for (size_t i = 0; i < poffs.count; i++)
+                printf("0x%lx\n", poffs.items[i].fileoff);
+        } else {
+            print_search_info(o_search_mode, o_search_case);
+            print_lookup_results(&poffs, o_search_mode);
+            print_lookup_summary(poffs.count);
         }
     }
     else if (o_mode == PATCH_MODE) {
@@ -150,12 +186,14 @@ int main(int argc, char **argv) {
                 break;
             }
         }
-        if (patched <= 1)
-            printf("%d(%zu) match patched\n", patched, poffs.count);
-        else {
-            if (!o_use_builtin_patch)
-                fprintf(stderr, "symp: warning, multiple arches used the same patch\n");
-            printf("%d(%zu) matches patched\n", patched, poffs.count);
+        if (!o_quiet) {
+            if (patched <= 1)
+                printf("%d(%zu) match patched\n", patched, poffs.count);
+            else {
+                if (!o_use_builtin_patch)
+                    fprintf(stderr, "symp: warning, multiple arches used the same patch\n");
+                printf("%d(%zu) matches patched\n", patched, poffs.count);
+            }
         }
     }
     else {

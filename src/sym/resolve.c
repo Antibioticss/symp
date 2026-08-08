@@ -19,6 +19,8 @@ void patch_off_list_init(patch_off_list_t *list) {
 }
 
 void patch_off_list_free(patch_off_list_t *list) {
+    for (size_t i = 0; i < list->count; i++)
+        free(list->items[i].symbol_name);
     free(list->items);
     patch_off_list_init(list);
 }
@@ -84,11 +86,13 @@ static symtype_t determine_type(const char *symbol_name) {
     return REGULAR_SYMBOL;
 }
 
-static void append_match(patch_off_list_t *out, int32_t cputype, uint32_t max_patch_len, uint64_t addr) {
+static void append_match(patch_off_list_t *out, int32_t cputype, uint32_t max_patch_len,
+                         uint64_t addr, const char *symbol_name) {
     patch_off_t poff = {
         .cputype = cputype,
         .fileoff = (long)addr,
         .maxplen = (int)max_patch_len,
+        .symbol_name = symbol_name ? strdup(symbol_name) : NULL,
     };
     patch_off_list_push(out, poff);
 }
@@ -104,7 +108,7 @@ size_t lookup_symbol_macho(FILE *fp, const char *symbol_name, patch_off_list_t *
         const macho_basic_info_t *basic_info = parse_basic_info(fp);
         cputype = basic_info->cputype;
         append_match(out, cputype, max_patch_len,
-                     str2uint64(symbol_name) + basic_info->base_offset + basic_info->vm_slide);
+                     str2uint64(symbol_name) + basic_info->base_offset + basic_info->vm_slide, NULL);
         free((void *)basic_info);
         break;
     }
@@ -116,7 +120,7 @@ size_t lookup_symbol_macho(FILE *fp, const char *symbol_name, patch_off_list_t *
         symbol_matches_init(&matches);
         solve_symbol(fp, symbol_info, symbol_name, search_mode, search_case, &matches);
         for (size_t i = 0; i < matches.count; i++) {
-            append_match(out, cputype, max_patch_len, matches.addrs[i]);
+            append_match(out, cputype, max_patch_len, matches.addrs[i], matches.names[i]);
         }
         symbol_matches_free(&matches);
         free((void *)symbol_info);
@@ -129,7 +133,7 @@ size_t lookup_symbol_macho(FILE *fp, const char *symbol_name, patch_off_list_t *
         cputype = objc_info->cputype;
         symbol_address = solve_objc_symbol(fp, objc_info, symbol_name);
         if (symbol_address != 0) {
-            append_match(out, cputype, max_patch_len, (uint64_t)symbol_address);
+            append_match(out, cputype, max_patch_len, (uint64_t)symbol_address, NULL);
         }
         free((void *)objc_info);
         break;
