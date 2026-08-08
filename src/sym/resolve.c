@@ -92,10 +92,11 @@ static symtype_t determine_type(const char *symbol_name) {
 }
 
 static void append_match(patch_off_list_t *out, int32_t cputype, uint32_t max_patch_len,
-                         uint64_t addr, const char *symbol_name) {
+                         uint64_t addr, const char *symbol_name, long module_base) {
     patch_off_t poff = {
         .cputype = cputype,
         .fileoff = (long)addr,
+        .addr = (long)(addr - module_base),
         .maxplen = (int)max_patch_len,
         .symbol_name = symbol_name ? strdup(symbol_name) : NULL,
     };
@@ -113,7 +114,7 @@ size_t lookup_symbol_macho(FILE *fp, const char *symbol_name, patch_off_list_t *
         const macho_basic_info_t *basic_info = parse_basic_info(fp);
         cputype = basic_info->cputype;
         append_match(out, cputype, max_patch_len,
-                     str2uint64(symbol_name) + basic_info->base_offset + basic_info->vm_slide, NULL);
+                     str2uint64(symbol_name) + basic_info->base_offset + basic_info->vm_slide, NULL, basic_info->base_offset);
         free((void *)basic_info);
         break;
     }
@@ -125,7 +126,7 @@ size_t lookup_symbol_macho(FILE *fp, const char *symbol_name, patch_off_list_t *
         symbol_matches_init(&matches);
         solve_symbol(fp, symbol_info, symbol_name, search_mode, search_case, &matches);
         for (size_t i = 0; i < matches.count; i++) {
-            append_match(out, cputype, max_patch_len, matches.addrs[i], matches.names[i]);
+            append_match(out, cputype, max_patch_len, matches.addrs[i], matches.names[i], symbol_info->base_offset);
         }
         symbol_matches_free(&matches);
         free((void *)symbol_info);
@@ -139,7 +140,7 @@ size_t lookup_symbol_macho(FILE *fp, const char *symbol_name, patch_off_list_t *
         symbol_matches_init(&matches);
         solve_objc_symbol(fp, objc_info, symbol_name, search_mode, search_case, &matches);
         for (size_t i = 0; i < matches.count; i++) {
-            append_match(out, cputype, max_patch_len, matches.addrs[i], matches.names[i]);
+            append_match(out, cputype, max_patch_len, matches.addrs[i], matches.names[i], objc_info->base_offset);
         }
         symbol_matches_free(&matches);
         free((void *)objc_info);

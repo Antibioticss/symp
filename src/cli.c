@@ -12,6 +12,7 @@ data_t o_patch_data = {0, NULL};
 bool o_use_builtin_patch = false;
 int o_builtin_idx = -1;
 bool o_quiet = false;
+bool o_vmaddr_output = false;
 search_mode_t o_search_mode = FULL_STRING_MATCH;
 search_case_t o_search_case = SEARCH_CASE_SENSITIVE;
 
@@ -24,6 +25,7 @@ static void usage() {
     puts("  -b, --binary <binary>     use a binary file as patch");
     puts("  -x, --hex <hex string>    hex string of the patch");
     puts("  -q, --quiet               suppress match count messages");
+    puts("  --vmaddr                  print addresses as architecture-relative offsets");
     puts("  -v, --version             show version number");
     puts("  -h, --help                show this usage text");
     puts("  -r, --regexp              use regular expressions for symbol matching");
@@ -48,6 +50,7 @@ int parse_arguments(int argc, char **argv) {
             {"binary",    required_argument, 0, 'b'},
             {"hex",       required_argument, 0, 'x'},
             {"quiet",     no_argument, 0, 'q'},
+            {"vmaddr",    no_argument, 0, 0},
             {"version",   no_argument, 0, 'v'},
             {"help",      no_argument, 0, 'h'},
             {"regexp",    no_argument, 0, 'r'},
@@ -164,6 +167,12 @@ int parse_arguments(int argc, char **argv) {
         case 'q':
             o_quiet = true;
             break;
+        case 0:
+            if (strcmp(long_options[option_index].name, "vmaddr") == 0) {
+                o_vmaddr_output = true;
+                break;
+            }
+            /* fall through */
         case 'v':
             printf("symp v%s\n", VERSION_STR);
             o_mode = USAGE_MODE;

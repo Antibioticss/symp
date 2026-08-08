@@ -10,6 +10,7 @@ typedef struct {
     int cputype;
     int maxplen;  /* max patch lenth */
     long fileoff;
+    long addr;
     char *symbol_name; /* set for substring/regexp matches; owned by patch_off_list_t */
 } patch_off_t;
 

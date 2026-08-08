@@ -47,6 +47,10 @@ static void print_search_info(search_mode_t search_mode, search_case_t search_ca
     printf("search mode: %s (%s)\n", search_mode_label(search_mode), search_case_label(search_case));
 }
 
+static void print_addresses_info(bool is_vmaddr_output) {
+    printf("Addresses type: %s\n", is_vmaddr_output ? "Virtual memory address (vmaddr)" : "File offset (from start of file)");
+}
+
 static void print_arch_header(int32_t cputype) {
     const char *arch_name = arch2str(cputype);
     if (arch_name != NULL)
@@ -61,10 +65,11 @@ static void print_lookup_results_range(const patch_off_list_t *poffs, size_t sta
 
     for (size_t i = start; i < end; i++) {
         const patch_off_t *poff = &poffs->items[i];
+        const long display_value = o_vmaddr_output ? poff->addr : poff->fileoff;
         if (show_symbol_names && poff->symbol_name != NULL)
-            printf("0x%lx: %s\n", poff->fileoff, poff->symbol_name);
+            printf("0x%lx: %s\n", display_value, poff->symbol_name);
         else
-            printf("0x%lx\n", poff->fileoff);
+            printf("0x%lx\n", display_value);
     }
 }
 
@@ -191,9 +196,13 @@ int main(int argc, char **argv) {
 
     if (o_mode == LOOKUP_MODE) {
         if (o_quiet) {
-            for (size_t i = 0; i < poffs.count; i++)
-                printf("0x%lx\n", poffs.items[i].fileoff);
+            for (size_t i = 0; i < poffs.count; i++) {
+                const patch_off_t *poff = &poffs.items[i];
+                const long display_value = o_vmaddr_output ? poff->addr : poff->fileoff;
+                printf("0x%lx\n", display_value);
+            }
         } else {
+            print_addresses_info(o_vmaddr_output);
             print_search_info(o_search_mode, o_search_case);
             print_lookup_summary(poffs.count);
         }
@@ -207,6 +216,8 @@ int main(int argc, char **argv) {
             }
         }
         if (!o_quiet) {
+            print_addresses_info(o_vmaddr_output);
+            print_search_info(o_search_mode, o_search_case);
             if (patched <= 1)
                 printf("%d(%zu) match patched\n", patched, poffs.count);
             else {
