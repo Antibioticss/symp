@@ -13,6 +13,7 @@ add_executable(symp
 	src/fileio.c
 	src/builtin.c
 	src/sym/macho.c
+	src/sym/search_common.c
 	src/sym/symbol.c
 	src/sym/objcmeta.c
 	src/sym/resolve.c
