@@ -11,45 +11,6 @@
 #include <mach-o/loader.h>
 #include <regex.h>
 
-static const size_t SYMBOL_MATCHES_INIT_CAP = 16;
-
-void symbol_matches_init(symbol_matches_t *m) {
-    m->addrs = NULL;
-    m->names = NULL;
-    m->count = 0;
-    m->capacity = 0;
-}
-
-void symbol_matches_free(symbol_matches_t *m) {
-    if (m->names != NULL) {
-        for (size_t i = 0; i < m->count; i++)
-            free(m->names[i]);
-    }
-    free(m->addrs);
-    free(m->names);
-    symbol_matches_init(m);
-}
-
-static void symbol_matches_push(symbol_matches_t *m, uint64_t addr, const char *name) {
-    if (m->count == m->capacity) {
-        size_t new_cap = m->capacity == 0 ? SYMBOL_MATCHES_INIT_CAP : m->capacity * 2;
-        uint64_t *new_addrs = realloc(m->addrs, new_cap * sizeof(uint64_t));
-        char **new_names = realloc(m->names, new_cap * sizeof(char *));
-        if (new_addrs == NULL || new_names == NULL) {
-            fprintf(stderr, "symp: out of memory while collecting symbol matches\n");
-            free(new_addrs);
-            free(new_names);
-            return;
-        }
-        m->addrs = new_addrs;
-        m->names = new_names;
-        m->capacity = new_cap;
-    }
-    m->addrs[m->count] = addr;
-    m->names[m->count] = name ? strdup(name) : NULL;
-    m->count++;
-}
-
 static uint64_t read_uleb128(const uint8_t **p) {
     int bit = 0;
     uint64_t result = 0;
@@ -59,18 +20,6 @@ static uint64_t read_uleb128(const uint8_t **p) {
         bit += 7;
     } while (*(*p)++ & 0x80);
     return result;
-}
-
-static bool str_equals(const char *a, const char *b, search_case_t search_case) {
-    if (search_case == SEARCH_CASE_INSENSITIVE)
-        return strcasecmp(a, b) == 0;
-    return strcmp(a, b) == 0;
-}
-
-static bool str_contains(const char *haystack, const char *needle, search_case_t search_case) {
-    if (search_case == SEARCH_CASE_INSENSITIVE)
-        return strcasestr(haystack, needle) != NULL;
-    return strstr(haystack, needle) != NULL;
 }
 
 static uint64_t trie_query(const uint8_t *export, const char *name, search_case_t search_case) {
@@ -195,20 +144,6 @@ static void trie_dfs_regexp(const uint8_t *export, uint64_t node_off,
     buf[buf_len] = '\0';
 }
 
-static bool match_symbol(const char *string, const char *pattern, search_mode_t mode,
-                         search_case_t search_case, const regex_t *preg) {
-    switch (mode) {
-    case FULL_STRING_MATCH:
-        return str_equals(string, pattern, search_case);
-    case SUBSTRING_MATCH:
-        return str_contains(string, pattern, search_case);
-    case REGEXP_MATCH:
-        return regexec(preg, string, 0, NULL, 0) == 0;
-    default:
-        return false;
-    }
-}
-
 size_t solve_symbol(FILE *fp, const macho_symbol_info_t *macho_info, const char *symbol_name,
                     search_mode_t search_mode, search_case_t search_case, symbol_matches_t *out) {
     size_t before = out->count;
@@ -218,10 +153,7 @@ size_t solve_symbol(FILE *fp, const macho_symbol_info_t *macho_info, const char 
     bool preg_compiled = false;
 
     if (search_mode == REGEXP_MATCH) {
-        int regflags = REG_EXTENDED | REG_ENHANCED | REG_NOSUB;
-        if (search_case == SEARCH_CASE_INSENSITIVE)
-            regflags |= REG_ICASE;
-        if (regcomp(&preg, symbol_name, regflags) != 0) {
+        if (!compile_regex(&preg, symbol_name, search_case)) {
             fprintf(stderr, "Could not compile regex: %s\n", symbol_name);
             return 0;
         }

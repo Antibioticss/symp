@@ -6,6 +6,7 @@
 #include <stdio.h>
 #include <stdint.h>
 #include <stdbool.h>
+#include <regex.h>
 
  #define max(a,b) \
    ({ __typeof__ (a) _a = (a); \
@@ -91,6 +92,12 @@ typedef struct {
 
 void symbol_matches_init(symbol_matches_t *m);
 void symbol_matches_free(symbol_matches_t *m);
+void symbol_matches_push(symbol_matches_t *m, uint64_t addr, const char *name);
+bool str_equals(const char *a, const char *b, search_case_t search_case);
+bool str_contains(const char *haystack, const char *needle, search_case_t search_case);
+bool compile_regex(regex_t *preg, const char *pattern, search_case_t search_case);
+bool match_symbol(const char *string, const char *pattern, search_mode_t mode,
+                  search_case_t search_case, const regex_t *preg);
 
 /* defined in symbol.c */
 size_t solve_symbol(FILE *fp, const macho_symbol_info_t *macho_info, const char *symbol_name,

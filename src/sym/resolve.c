@@ -128,13 +128,15 @@ size_t lookup_symbol_macho(FILE *fp, const char *symbol_name, patch_off_list_t *
     }
     case OBJC_SYMBOL: {
         const macho_objc_info_t *objc_info = parse_objc_info(fp);
-        long symbol_address;
+        symbol_matches_t matches;
 
         cputype = objc_info->cputype;
-        symbol_address = solve_objc_symbol(fp, objc_info, symbol_name);
-        if (symbol_address != 0) {
-            append_match(out, cputype, max_patch_len, (uint64_t)symbol_address, NULL);
+        symbol_matches_init(&matches);
+        solve_objc_symbol(fp, objc_info, symbol_name, search_mode, search_case, &matches);
+        for (size_t i = 0; i < matches.count; i++) {
+            append_match(out, cputype, max_patch_len, matches.addrs[i], matches.names[i]);
         }
+        symbol_matches_free(&matches);
         free((void *)objc_info);
         break;
     }
