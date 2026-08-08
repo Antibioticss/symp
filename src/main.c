@@ -47,16 +47,29 @@ static void print_search_info(search_mode_t search_mode, search_case_t search_ca
     printf("search mode: %s (%s)\n", search_mode_label(search_mode), search_case_label(search_case));
 }
 
-static void print_lookup_results(const patch_off_list_t *poffs, search_mode_t search_mode) {
+static void print_arch_header(int32_t cputype) {
+    const char *arch_name = arch2str(cputype);
+    if (arch_name != NULL)
+        printf("architecture: %s\n", arch_name);
+    else
+        printf("architecture: unknown (0x%x)\n", cputype);
+}
+
+static void print_lookup_results_range(const patch_off_list_t *poffs, size_t start, size_t end,
+                                       search_mode_t search_mode) {
     bool show_symbol_names = search_mode != FULL_STRING_MATCH;
 
-    for (size_t i = 0; i < poffs->count; i++) {
+    for (size_t i = start; i < end; i++) {
         const patch_off_t *poff = &poffs->items[i];
         if (show_symbol_names && poff->symbol_name != NULL)
             printf("0x%lx: %s\n", poff->fileoff, poff->symbol_name);
         else
             printf("0x%lx\n", poff->fileoff);
     }
+}
+
+static void print_lookup_results(const patch_off_list_t *poffs, search_mode_t search_mode) {
+    print_lookup_results_range(poffs, 0, poffs->count, search_mode);
 }
 
 static void print_lookup_summary(size_t count) {
@@ -74,6 +87,14 @@ int find_symbol(FILE *fp, int offset, int32_t cputype, patch_off_list_t *poffs,
         fseek(fp, offset, SEEK_SET);
         if (lookup_symbol_macho(fp, o_symbol, poffs, search_mode, search_case) == 0)
             fprintf(stderr, "symbol not found for arch '%s'!\n", arch2str(cputype));
+
+        if (o_mode == LOOKUP_MODE && !o_quiet) {
+            const size_t added = poffs->count - before;
+            if (added > 0) {
+                print_arch_header(cputype);
+                print_lookup_results_range(poffs, before, poffs->count, search_mode);
+            }
+        }
     }
     return (int)(poffs->count - before);
 }
@@ -174,7 +195,6 @@ int main(int argc, char **argv) {
                 printf("0x%lx\n", poffs.items[i].fileoff);
         } else {
             print_search_info(o_search_mode, o_search_case);
-            print_lookup_results(&poffs, o_search_mode);
             print_lookup_summary(poffs.count);
         }
     }
