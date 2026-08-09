@@ -12,6 +12,7 @@ data_t o_patch_data = {0, NULL};
 bool o_use_builtin_patch = false;
 int o_builtin_idx = -1;
 bool o_quiet = false;
+bool o_rva = false;
 
 static void usage() {
     puts("symp - Mach-O symbol patching tool");
@@ -22,6 +23,7 @@ static void usage() {
     puts("  -b, --binary <binary>     use a binary file as patch");
     puts("  -x, --hex <hex string>    hex string of the patch");
     puts("  -q, --quiet               suppress match count messages");
+    puts("  -r, --rva                 output virtual address (RVA) instead of file offset");
     puts("  -v, --version             show version number");
     puts("  -h, --help                show this usage text");
 }
@@ -41,12 +43,13 @@ int parse_arguments(int argc, char **argv) {
             {"binary", required_argument, 0, 'b'},
             {"hex",    required_argument, 0, 'x'},
             {"quiet",  no_argument, 0, 'q'},
+            {"rva",    no_argument, 0, 'r'},
             {"version",no_argument, 0, 'v'},
             {"help",   no_argument, 0, 'h'},
             {0, 0, 0, 0}
         };
         int option_index = 0;
-        int c = getopt_long(argc, argv, "a:p:b:x:qvh", long_options, &option_index);
+        int c = getopt_long(argc, argv, "a:p:b:x:qrhv", long_options, &option_index);
         if (c == -1)
             break;
         switch (c) {
@@ -122,6 +125,9 @@ int parse_arguments(int argc, char **argv) {
             break;
         case 'q':
             o_quiet = true;
+            break;
+        case 'r':
+            o_rva = true;
             break;
         case 'v':
             printf("symp v%s\n", VERSION_STR);

@@ -67,6 +67,7 @@ bool lookup_symbol_macho(FILE *fp, const char *symbol_name, patch_off_t *poffout
     case HEX_OFFSET: {
         const macho_basic_info_t *basic_info = parse_basic_info(fp);
         cputype = basic_info->cputype;
+        poffout->vm_slide = basic_info->vm_slide;
         symbol_address = str2uint64(symbol_name) + basic_info->base_offset + basic_info->vm_slide;
         free((void *)basic_info);
         break;
@@ -74,6 +75,7 @@ bool lookup_symbol_macho(FILE *fp, const char *symbol_name, patch_off_t *poffout
     case REGULAR_SYMBOL: {
         const macho_symbol_info_t *symbol_info = parse_symbol_info(fp);
         cputype = symbol_info->cputype;
+        poffout->vm_slide = symbol_info->vm_slide;
         // max_patch_len = symbol_info->stub_len; // we don't know if the symbol is from stubs
         symbol_address = solve_symbol(fp, symbol_info, symbol_name);
         free((void *)symbol_info);
@@ -82,6 +84,10 @@ bool lookup_symbol_macho(FILE *fp, const char *symbol_name, patch_off_t *poffout
     case OBJC_SYMBOL: {
         const macho_objc_info_t *objc_info = parse_objc_info(fp);
         cputype = objc_info->cputype;
+        if (objc_info->text_vm.addr != 0)
+            poffout->vm_slide = objc_info->text_vm.off - objc_info->text_vm.addr;
+        else
+            poffout->vm_slide = 0;
         symbol_address = solve_objc_symbol(fp, objc_info, symbol_name);
         free((void *)objc_info);
         break;

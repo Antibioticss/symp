@@ -8,6 +8,7 @@ typedef struct {
     int cputype;
     int maxplen;  /* max patch lenth */
     long fileoff;
+    long vm_slide;
 } patch_off_t;
 
 /* 

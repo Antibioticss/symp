@@ -134,7 +134,10 @@ int main(int argc, char **argv) {
 
     if (o_mode == LOOKUP_MODE) {
         for (int i = 0; i < npoffs; i++) {
-            printf("0x%lx\n", poffs[i].fileoff);
+            if (o_rva)
+                printf("0x%lx\n", (unsigned long)(poffs[i].fileoff - poffs[i].vm_slide));
+            else
+                printf("0x%lx\n", (unsigned long)poffs[i].fileoff);
         }
         if (!o_quiet) {
             // one match for an arch at most
